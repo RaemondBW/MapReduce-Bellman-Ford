@@ -5,8 +5,8 @@
  * Partner 1 Name: Edward Groshev
  * Partner 1 Login: cs61c-gq
  *
- * Partner 2 Name:
- * Partner 2 Login:
+ * Partner 2 Name: Raemond Bergstrom-Wood
+ * Partner 2 Login: cs61c-jz
  *
  * REMINDERS: 
  *
