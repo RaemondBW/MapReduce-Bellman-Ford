@@ -142,7 +142,7 @@ public class SmallWorld {
             denom = Long.parseLong(context.getConfiguration().get("denom"));
 
             // You can print it out by uncommenting the following line:
-            // System.out.println(denom);
+            //System.out.println(denom);
 
             // Example of iterating through an Iterable
             for (LongWritable value : values){            
@@ -156,7 +156,12 @@ public class SmallWorld {
     // ------- Add your additional Mappers and Reducers Here ------- //
 
 
+	public static class BFSmapper extends Mapper<LongWritable, LongWritable, LongWritable, LongWritable> {
 
+		public long denom;
+
+
+	}
 
 
 
