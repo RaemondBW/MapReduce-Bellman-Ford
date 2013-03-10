@@ -1,0 +1,269 @@
+<!DOCTYPE html PUBLIC "-//w3c//dtd html 4.01 transitional//en">
+<!-- saved from url=(0055)http://www-inst.eecs.berkeley.edu/~cs61c/sp13/projs/02/ -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <title>CS61C Project 2 - MapReduce</title>
+    <link rel="stylesheet" href="./CS61C Project 2 - MapReduce_files/style.css" type="text/css">
+<style type="text/css"></style></head>
+
+<body>
+<div class="header">
+    <h1>CS61C Spring 2013 Project 2: Small World Experiment with MapReduce</h1>
+    <big>TA: Sagar Karandikar</big><br>
+    <big>Part 1 Due: 03/17/13 @ 23:59:59</big><br>
+    <big>Part 2 Due: 03/24/13 @ 23:59:59</big>
+</div>
+
+
+<div class="content">
+    <div class="section" id="updates">
+        <h2><a name="updates">Updates</a></h2>
+        <ul> 
+            <li>No updates at this time! </li>
+        </ul>
+    </div>
+
+
+    <div class="section" id="rules">
+        <h2><a name="rules">Administrative</a></h2>
+        <ul> 
+            <li>You MUST work with a partner on this project (your partner does not have to be in your section). You may not work alone and you may not work in groups larger than two.</li>
+            <li>If you don't know Java well, partner with someone who knows Java well.</li>
+            <li>Submission instructions will be released later in the week.</li>
+        </ul>
+    </div>
+
+
+
+
+    <div class="section" id="summary">
+        <h2><a name="summary">Summary</a></h2>
+        <p>In this project you will use MapReduce to analyze data from real social networks. In Part 1, you will develop and test your code locally (on hive) and for Part 2, you will run it on Amazon EC2.</p>
+    </div>
+
+    <div class="section" id="intro">
+        <h2><a name="intro">Introduction</a></h2>
+        <p>Have you ever heard of the infamous <em><a href="https://en.wikipedia.org/wiki/Six_degrees_of_separation">six degrees of
+separation</a></em> or played the game <em><a href="https://en.wikipedia.org/wiki/Six_Degrees_of_Kevin_Bacon">Six Degrees of
+Kevin Bacon</a></em>? They are both outcomes of the <em><a href="https://en.wikipedia.org/wiki/Small-world_phenomenon">small-world
+property</a></em> of social networks, which states that the average distance
+between any two vertices grows very slowly (logarithmically) relative to the
+size of the network. In practice, even for very large social networks, the
+median distance is small -- Twitter user follows (4), MSN Message Conversations
+(6), Facebook friendships (5), and Hollywood co-actors (4).</p>
+        <p>We will use the large processing capabilities of a Hadoop cluster to
+analyze data from real social networks to approximate the distance distribution
+to get a feel for how far apart most things are. To do this, we will randomly
+pick a subset of the vertices in the graph, and compute their distances to all
+other vertices. Your final program will take in a social graph and a constant
+for sampling and it will return data that we could use to produce a histogram of
+distance versus frequency of that distance for our selected sample.</p>
+    </div>
+
+    <div class="section" id="algo">
+        <h2><a name="algo">Algorithm</a></h2>
+        <p>Formally, we can think of each input social network as defining
+a graph. Each person is a vertex and each relationship is an edge. This graph is
+unweighted since all relationships (friendships, follows, collaborations) are
+equivalent. In general, the distance between any two vertices is the sum of 
+the weights of edges in the
+shortest path between them. To find the all of the distances from one starting
+point, one would normally use a Single-source Shortest Path algorithm such as <a href="https://en.wikipedia.org/wiki/Dijkstra's_algorithm">Dijkstra's
+Algorithm</a>, but since the graph is unweighted, we can get away with a simple
+<a href="http://en.wikipedia.org/wiki/Breadth-first_search">Breadth-First Search (BFS)</a>. 
+Better yet, the BFS will be much easier to
+parallelize. To get a feel for how this works, examine the pseudocode for
+a serial BFS implementation below:</p>
+    <pre class="literal-block"><b>def bfs(vertices, s)</b>
+  for v in vertices
+    dist[v] = -1
+    dist[s] = 0
+  queue = [s]
+  for v in queue
+    for n in neighbors(v)
+      if dist[n] == -1
+        dist[n] = dist[v] + 1
+        queue += [n]
+  return dist</pre>
+    <p>This variant of breadth-first search will return the distance of each vertex
+from the starting point <code>s</code>. Notice that each vertex is visited
+only once, so its distance is only updated if it is ever reached and has yet to 
+be visited. Your parallel version for MapReduce will be very different (this
+project is <em>not</em> as straightforward as dumping the above code into a mapper!), but
+the above example was given to show that BFS can compute distances on an unweighted
+graph.</p>
+    <p>We will only perform breadth-first searches from a subset of the nodes to
+save on time since not much more fidelity is gained by examining all of them.
+In short, our program will: load in the social graph, perform multiple breadth-first
+searches, and compute the histogram. We'll be performing all of these 
+breadth first searches simultaneously,
+since we want to maximize the amount of work we complete in a given unit of time. 
+This will also result in fewer copies of the graph (lower disk/memory usage) and fewer
+sequential mapreduces (saving time), both of which accelerate processing drastically.
+</p><p>
+To pick the starting points, we search from each vertex with the probability of
+1/<em>denom</em>, so that in expectation, the program will perform
+<em>num_vertices</em>/<em>denom</em> searches. We leave the actual number of
+searches to chance since this method is better for a distributed setting like
+MapReduce. For each vertex, the choice of whether to search from it is
+completely parallel, and the only global information it needs is the probability
+with which it should be selected. (Hint/sidenote: At no point should you be 
+calculating how many vertices are in the graph). Once we're doing running our 
+mapper and reducer for BFS, we'll have a final phase of MapReduce that produces
+the histogram data, which is simply the totals of how many shortest paths are of
+each distance.
+</p><p>
+At this point, you're probably wondering how you'll test your code if everything 
+is randomized. Notice however that if we set <code>denom</code> to one, we'll run 
+a BFS starting at every vertex. Thus, the deterministic way to test our code
+involves setting <code>denom</code> to one and passing in a relatively small 
+graph.
+</p>
+
+    </div>
+
+    <div class="section" id="details">
+        <h2><a name="details">Problem Details</a></h2>
+        <p>The input graphs are encoded in Hadoop's
+<code>SequenceFileType</code> and each element is <code>(key,value)</code>
+= <code>(LongWritable source, LongWritable destination)</code>. The output
+should be of the form <code>(key,value)</code>
+= <code>(LongWritable distance, LongWritable total)</code>, where total is the
+number of shortest paths with that distance. In order to keep things managable, 
+we use the variable <code>MAX_ITERATIONS</code> to limit the depth of our BFS. 
+By default, this value is set to <code>MAX_ITERATIONS</code> = 20. For our 
+purposes, this is a pretty reasonable limit that lets us keep runtime under 
+control in the presence of a few outliers.</p>
+    <p>The vertices in each graph are given by long identifiers. The address
+range is not necessarily contiguous (e.g. could have vertices {0,1,5,9}). Each
+input relation is intended to be treated as a directed edge. If the original
+relation is undirected, the other direction for that relation will be somewhere
+in the input. There can be repeat relations, but there will not be loops
+(self-edges).</p>
+    <p>The <em>denom</em> constant will be fed in on the command line. However,
+you'll notice that the skeleton takes care of making <code>denom</code> accessible
+from within your mappers and reducers by attaching it to the <code>Configuration</code>
+object for MapReduce job.
+
+</p>
+    <p>Finally, note that if a vertex is unreachable (or has a distance greater than
+<code>MAX_ITERATIONS</code>), it should not contribute to the histogram data.</p>
+    <p>To help understand the intended operation, we provide an <a href="http://www-inst.eecs.berkeley.edu/~cs61c/sp13/projs/02/example.html">example</a>.
+    </p></div>
+
+    <div class="section" id="provided">
+        <h2><a name="provided">Provided Resources</a></h2>
+        <p>We provide you with <code>SmallWorld.java</code> and a <code>Makefile</code> in <code>~cs61c/proj/02</code>. You can copy them to your home directory by:</p>
+        <pre class="literal-block">$ mkdir ~/proj02
+$ cp -r ~cs61c/proj/02 ~/proj02</pre>
+        <p>There should not be a need for you to create any additional files,
+but if you do, be sure that <code>make</code> compiles them all and that
+<code>main</code> is still present in the <code>SmallWorld</code> class in
+<code>sw.jar</code>. <em>Please note that if you submit code that does not compile by running <code>make</code>, we will not grade it and you will receive a zero.</em> </p><p>Feel free to 
+modify <code>SmallWorld.java</code> however
+you want while still completing the program requirements. The code in there is
+intended to take care of tedious coding details or provide examples of useful
+things you may want to modify or mimic in your solution.</p>
+    <p>The skeleton code assumes your code will use three types of mapreduces:
+</p><ol>
+    <li>Graph loading, which will run once. (Provided as example)</li>
+    <li>Breadth-First Search, which will run <code>MAX_ITERATIONS</code> times. (You'll need to add these classes.)</li>
+    <li>Histogram making, which will run once. (You'll need to add these classes.)</li>
+</ol>
+
+The given code in <code>main</code> supports this and is intended to demonstrate
+how to chain and even iterate multiple mapreduce jobs. Currently all of the maps
+and reduces are identity, but contain code that is there to demonstrate
+accessing and using <code>denom</code> and other variables you may wish to pass
+into your mappers/reducers from <code>main</code>. (Hint: A common use for such
+variables is to maintain the iteration count while doing BFS.) <p></p>
+    <p>The <code>EValue</code> class is provided to give an example
+implementation of a class that implements Hadoop's <code>Writable</code>
+Interface. This allows it to be the input value or output value of a map or 
+reduce phase. For it to be used as a key type for map or reduce, it would need 
+to implement the <code>WritableComparable</code> interface. <code>EValue</code> currently
+shows you how to store various fields, including an array, but feel free to modify it to
+suit your implementation.</p>
+    <p>You should complete this project <em>on the hive machines in 330 Soda</em>. If
+you are not sitting physically in front of one of these lab machines, you can
+access one of <a href="https://inst.eecs.berkeley.edu/cgi-bin/clients.cgi?choice=330soda">them</a>
+remotely by following these <a href="https://inst.eecs.berkeley.edu/connecting.html#network">instructions</a>.
+The code should run locally (on the hive machines) in the same manner as in <a href="http://inst.eecs.berkeley.edu/~cs61c/sp13/labs/06/">lab 6</a>. We won't 
+concern ourselves with running remotely on EC2 until Part II. We
+recommend spending the majority of your development time for this part working locally and
+with a small dataset to speed up and simplify debugging. The syntax for using
+the completed program is:</p><p>
+    </p><pre class="literal-block">$ make clean # This will cleanup old output files and other stuff
+$ make # This will compile SmallWorld.java
+$ hadoop jar sw.jar SmallWorld input_graph output_dir denom</pre>
+<br>    For input_graph, you'll be using one of the following:
+    <h4>Local Graphs (<code>~cs61c/proj2data/</code>)</h4>
+      <ul>
+        <li><code>ring4.seq</code> - 4 vertices in a ring (0→1, 1→2, 2→3, 3→0)</li>
+        <li><code>cit-HepPh.sequ</code> - 35K vertices from High Energy Physics collaborations</li>
+      </ul>
+
+    <p>Later on we'll run BFS on some more interesting graphs. However analyzing
+    these graphs will use a large amount of resources, so we will analyze those
+    on EC2 in Part II of the project.</p>
+    </div>
+
+    <div class="section" id="tips">
+        <h2><a name="tips">Tips</a></h2>
+    <ul>
+     <li>Both Java and Hadoop have many popular versions with different APIs. We
+are using: <a href="http://docs.oracle.com/javase/6/docs/api/">Java 6</a> and <a href="http://archive.cloudera.com/cdh/3/hadoop/api/index.html">Hadoop
+0.20.2</a></li>
+      <li>You may want to change the output (and input) formats to be more
+readable during development, to something like <code>TextOutput</code>. The
+<code>SequenceFileOutputFormat</code> is the fastest because it is a compressed
+binary encoding.</li>
+      <li>The number of distance 0 shortest paths is the number of searches done</li>
+      <li>Try to keep the number of searches for the huge graphs on the order of a few dozen or less</li>
+      <li>A <em>denom</em> value of 1 will search from every vertex</li>
+      <li>The correct output for <code>ring4.seq</code> with <em>denom</em>=1 is {(0,4),(1,4),(2,4),(3,4)}</li>
+      <li>When running <code>cit-HepPh.sequ</code> on <code>hive</code>, you should be able to complete within your disk quota with <em>denom</em>=10000.</li>
+    </ul>
+    </div>
+
+
+    <div class="section" id="parts">
+        <h2><a name="parts">Assignment</a></h2>
+    <h3>Part 1 (due 3/17/13 @ 23:59:59)</h3>
+    <p>Complete the above problem locally and submit <code>SmallWorld.java</code>. Submit the <code>Makefile</code> (if modified) or any additional source files if needed.</p>
+    <div class="section" id="submit">
+        <h2><a name="submit">Submission</a></h2>
+            <p>
+            This area will be updated with submission instructions once submissions are opened.
+            </p>
+    </div>
+
+
+    <div class="section" id="grading">
+        <h2><a name="grading">Grading</a></h2>
+        <p>Part 1 is worth 2/3 of your Project 2 grade.</p>
+        <p>Part 2 will be worth 1/3 of your Project 2 grade.</p>
+        <br>
+    </div>
+
+    <div id="acknowledge">
+
+        <h2>Acknowledgements</h2>
+
+        <p>Thanks to Scott Beamer (a former TA), the original creator of this project.</p>
+    </div>
+
+    <div class="section" id="links">
+        <h2><a name="links">Additional Links (NOT required reading) on Social Network Analysis</a></h2>
+        <ol>
+            <li>Haewoon Kwak, Changhyun Lee, Hosung Park, and Sue Moon. <a href="http://an.kaist.ac.kr/traces/WWW2010.html">What is Twitter, a Social Network or a News Media?</a>. <em>WWW 2010</em>. (analysis of Twitter and source of our Twitter data)</li>
+            <li>Duncan J. Watts and Steven H. Strogatz. <a href="http://research.yahoo.com/files/w_s_NATURE_0.pdf">Collective dynamics of ‘small-world’ networks</a>. <em>Nature</em>:393, 1998. (mathematics behind small-world networks)</li>
+            <li><a href="http://snap.stanford.edu/data/index.html">Stanford Network Analysis Project</a> (a great source of social network data and the source of cit-HepPh)</li>
+            <li><a href="http://law.dsi.unimi.it/datasets.php">Laboratory for Web Algorithmics</a> (source of the Hollywood data and has current metrics on largest social networks)</li>
+            <li><a href="http://haselgrove.id.au/wikipedia.htm">Wikipedia Crawl</a></li>
+        </ol>
+    </div>
+</div>
+
+
+</div></body></html>
