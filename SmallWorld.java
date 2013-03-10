@@ -149,7 +149,6 @@ public class SmallWorld {
                 context.write(key, value);
             }
         }
-
     }
 
 
@@ -160,7 +159,9 @@ public class SmallWorld {
 
 		public long denom;
 
-
+		public void map(LongWritable key, LongWritable value, Context context) throws IOException, InterruptedException {
+			
+		}
 	}
 
 
