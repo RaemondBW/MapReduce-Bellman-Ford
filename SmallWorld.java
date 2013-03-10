@@ -155,14 +155,15 @@ public class SmallWorld {
     // ------- Add your additional Mappers and Reducers Here ------- //
 
 
-	public static class BFSmapper extends Mapper<LongWritable, LongWritable, LongWritable, LongWritable> {
+    public static class BFSmapper extends Mapper<LongWritable, LongWritable,
+        LongWritable, LongWritable> {
 
-		public long denom;
+        public long denom;
 
-		public void map(LongWritable key, LongWritable value, Context context) throws IOException, InterruptedException {
-			
-		}
-	}
+        public void map(LongWritable key, LongWritable value, Context context) throws IOException, InterruptedException {
+            
+        }
+    }
 
 
 
