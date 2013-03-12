@@ -214,16 +214,29 @@ public class SmallWorld {
         public void reduce(LongWritable key, Iterable<LongWritable> values, 
             Context context) throws IOException, InterruptedException {
             // We can grab the denom field from context: 
+<<<<<<< HEAD
+            denom = Integer.parseInt(context.getConfiguration().get("denom"));
+
+            // Example of iterating through an Iterable
+            HashSet<Integer> tempDest = new HashSet<Integer>();
+            HashMap<Integer,String> tempDist = new HashMap<Integer,String>();
+            int newVal;
+=======
             denom = Long.parseLong(context.getConfiguration().get("denom"));
 
             // Example of iterating through an Iterable
             HashSet<Long> tempDest = new HashSet<Long>();
             HashMap<Long,String> tempDist = new HashMap<Long,String>();
             long newVal;
+>>>>>>> 7a9c14e630cc1537e50d303d22e5920b0c408656
             Random probability = new Random();
             boolean include = probability.nextInt(denom) == 0;
             for (LongWritable value : values) {
+<<<<<<< HEAD
+                newVal = (int)value.get();
+=======
                 newVal = value.get();
+>>>>>>> 7a9c14e630cc1537e50d303d22e5920b0c408656
                 tempDest.add(newVal);
             }
             if (include) {
