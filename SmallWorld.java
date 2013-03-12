@@ -77,6 +77,14 @@ public class SmallWorld {
             return destinations.contains(destination);
         }
 
+        public boolean isEmptyDestinations(){
+            return destinations.isEmpty();
+        }
+
+        public boolean isEmptyDistances(){
+            return distances.isEmpty();
+        }
+
         public Set<Long> listOfDestinations(){
             return destinations;
         }
@@ -87,6 +95,10 @@ public class SmallWorld {
 
         public Set<Long> listOfActiveNodes(){
             return activeNodes;
+        }
+
+        public void clearListOfActiveNodes(){
+            activeNodes.clear();
         }
 
         public long getDistance(long source){
@@ -217,18 +229,63 @@ public class SmallWorld {
 
 
     // ------- Add your additional Mappers and Reducers Here ------- //
-    // The second mapper. Part of the BFS process
+    // The second mapper. Part of the BFS process.
     public static class BFSMap extends Mapper<LongWritable, EValue, 
         LongWritable, EValue> {
 
         public void map(LongWritable key, EValue value, Context context)
                 throws IOException, InterruptedException {
-
+            Set<Long> tempActiveNodes = value.listOfActiveNodes();
+            if(!tempActiveNodes.isEmpty()){
+                LongWritable tempKey = new LongWritable();
+                long currDist = value.getDistance(key.get());
+                HashMap<Long,Long> tempDist = new HashMap<Long,Long>();
+                tempDist.put(key.get(),currDist+1);
+                HashSet<Long> tempActive = new HashSet<Long>();
+                tempActive.add(key.get());
+                EValue newVal = new EValue(null, tempDist, tempActive);
+                for(long node : value.listOfActiveNodes()){
+                    tempKey.set(node);
+                    context.write(tempKey,newVal);
+                }
+                value.clearListOfActiveNodes();
+            }
             context.write(key, value);
         }
     }
 
+    // The second reducer. Part of the BFS process.
+    public static class BFSReduce extends Reducer<LongWritable, EValue, 
+        LongWritable, EValue> {
 
+        public void reduce(LongWritable key, Iterable<EValue> values, 
+            Context context) throws IOException, InterruptedException {
+
+            HashSet<Long> tempDest = new HashSet<Long>();
+            HashMap<Long,Long> tempDist = new HashMap<Long,Long>();
+            HashSet<Long> tempActive = new HashSet<Long>();
+            long newDist;
+            for(EValue value : values) {
+                if(!value.isEmptyDestinations()){
+                    for(long node : value.listOfDestinations()){
+                        tempDest.add(node);
+                    }
+                }
+                for(long node : value.listOfDistanceSources()){
+                    newDist = value.getDistance(node);
+                    if (tempDist.containsKey(node)){
+                        newDist = Math.min(tempDist.get(node),newDist);
+                    }
+                    tempDist.put(node, newDist);
+                }
+                for(long node : value.listOfActiveNodes()){
+                    tempActive.add(node);
+                }
+            }
+            EValue newVal = new EValue(tempDest, tempDist, tempActive);
+            context.write(key,newVal);        
+        }
+    }
 
 
 
@@ -268,7 +325,7 @@ public class SmallWorld {
         /*job.setInputFormatClass(SequenceFileInputFormat.class);
         job.setOutputFormatClass(SequenceFileOutputFormat.class);*/
         job.setInputFormatClass(SequenceFileInputFormat.class);
-        job.setOutputFormatClass(TextOutputFormat.class);
+        job.setOutputFormatClass(SequenceFileInputFormat.class);
 
         // Input from command-line argument, output to predictable place
         FileInputFormat.addInputPath(job, new Path(args[0]));
@@ -278,7 +335,7 @@ public class SmallWorld {
         job.waitForCompletion(true);
 
         // Repeats your BFS mapreduce
-        /*int i = 0;
+        int i = 0;
         while (i < MAX_ITERATIONS) {
             job = new Job(conf, "bfs" + i);
             job.setJarByClass(SmallWorld.class);
@@ -292,7 +349,7 @@ public class SmallWorld {
             // You'll want to modify the following based on what you call
             // your mapper and reducer classes for the BFS phase.
             job.setMapperClass(BFSMap.class); // currently the default Mapper
-            job.setReducerClass(BFSReducer.class); // currently the default Reducer
+            job.setReducerClass(BFSReduce.class); // currently the default Reducer
 
             job.setInputFormatClass(SequenceFileInputFormat.class);
             job.setOutputFormatClass(TextOutputFormat.class);
@@ -304,7 +361,7 @@ public class SmallWorld {
             job.waitForCompletion(true);
             i++;
         }
-
+        /*
         // Mapreduce config for histogram computation
         job = new Job(conf, "hist");
         job.setJarByClass(SmallWorld.class);
