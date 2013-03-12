@@ -238,11 +238,14 @@ public class SmallWorld {
             Set<Long> tempActiveNodes = value.listOfActiveNodes();
             if(!tempActiveNodes.isEmpty()){
                 LongWritable tempKey = new LongWritable();
-                long currDist = value.getDistance(key.get());
                 HashMap<Long,Long> tempDist = new HashMap<Long,Long>();
-                tempDist.put(key.get(),currDist+1);
                 HashSet<Long> tempActive = new HashSet<Long>();
-                tempActive.add(key.get());
+                long currDist;
+                for(long node : tempActiveNodes){
+                    currDist = value.getDistance(node);
+                    tempDist.put(node,currDist+1);
+                    tempActive.add(node);
+                }
                 EValue newVal = new EValue(null, tempDist, tempActive);
                 for(long node : value.listOfDestinations()){
                     tempKey.set(node);
@@ -388,7 +391,7 @@ public class SmallWorld {
 
         // Feel free to modify these two lines as necessary:
         job.setMapOutputKeyClass(LongWritable.class);
-        job.setMapOutputValueClass(EValue.class);
+        job.setMapOutputValueClass(LongWritable.class);
 
         // DO NOT MODIFY THE FOLLOWING TWO LINES OF CODE:
         job.setOutputKeyClass(LongWritable.class);
