@@ -200,22 +200,34 @@ public class SmallWorld {
      * and using the denom field.  
      */
     public static class LoaderReduce extends Reducer<LongWritable, LongWritable, 
-        LongWritable, LongWritable> {
+        LongWritable, EValue> {
 
-        public long denom;
+        public int denom;
 
         public void reduce(LongWritable key, Iterable<LongWritable> values, 
             Context context) throws IOException, InterruptedException {
             // We can grab the denom field from context: 
-            denom = Long.parseLong(context.getConfiguration().get("denom"));
+            denom = Integer.parseInt(context.getConfiguration().get("denom"));
 
             // You can print it out by uncommenting the following line:
             //System.out.println(denom);
 
             // Example of iterating through an Iterable
-            for (LongWritable value : values){            
-                context.write(key, value);
+            HashSet<Integer> tempDest = new HashSet<Integer>();
+            HashMap<Integer,String> tempDist = new HashMap<Integer,String>();
+            //for (LongWritable value : values){
+            for (LongWritable value : values) {
+                //context.write(key, value);
+                tempDest.add((int)value.get());
+                boolean tf = new Random().nextInt(denom) == 0;
+                if (tf) {
+                    tempDist.put((int)value.get(),"f-1");
+                } else {
+                    tempDist.put((int)value.get(),"t-1");
+                }
             }
+            EValue newEvalue = new EValue(tempDest, tempDist);
+            context.write(key,newEvalue);
         }
     }
 
@@ -255,13 +267,15 @@ public class SmallWorld {
         job.setMapOutputKeyClass(LongWritable.class);
         job.setMapOutputValueClass(LongWritable.class);
         job.setOutputKeyClass(LongWritable.class);
-        job.setOutputValueClass(LongWritable.class);
+        job.setOutputValueClass(EValue.class);
 
         job.setMapperClass(LoaderMap.class);
         job.setReducerClass(LoaderReduce.class);
 
+        /*job.setInputFormatClass(SequenceFileInputFormat.class);
+        job.setOutputFormatClass(SequenceFileOutputFormat.class);*/
         job.setInputFormatClass(SequenceFileInputFormat.class);
-        job.setOutputFormatClass(SequenceFileOutputFormat.class);
+        job.setOutputFormatClass(TextOutputFormat.class);
 
         // Input from command-line argument, output to predictable place
         FileInputFormat.addInputPath(job, new Path(args[0]));
@@ -271,7 +285,7 @@ public class SmallWorld {
         job.waitForCompletion(true);
 
         // Repeats your BFS mapreduce
-        int i = 0;
+        /*int i = 0;
         while (i < MAX_ITERATIONS) {
             job = new Job(conf, "bfs" + i);
             job.setJarByClass(SmallWorld.class);
@@ -323,6 +337,6 @@ public class SmallWorld {
         FileInputFormat.addInputPath(job, new Path("bfs-"+ i +"-out"));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
 
-        job.waitForCompletion(true);
+        job.waitForCompletion(true);*/
     }
 }
