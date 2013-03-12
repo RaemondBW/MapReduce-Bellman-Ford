@@ -219,18 +219,13 @@ public class SmallWorld {
             // We can grab the denom field from context: 
             denom = Integer.parseInt(context.getConfiguration().get("denom"));
 
-            // You can print it out by uncommenting the following line:
-            //System.out.println(denom);
-
             // Example of iterating through an Iterable
             HashSet<Integer> tempDest = new HashSet<Integer>();
             HashMap<Integer,String> tempDist = new HashMap<Integer,String>();
-            //for (LongWritable value : values){
             int newVal;
             Random probability = new Random();
             for (LongWritable value : values) {
                 newVal = (int)value.get();
-                //context.write(key, value);
                 tempDest.add(newVal);
                 boolean tf = probability.nextInt(denom) == 0;
 
@@ -286,9 +281,9 @@ public class SmallWorld {
         job.setMapperClass(LoaderMap.class);
         job.setReducerClass(LoaderReduce.class);
 
-        /*job.setInputFormatClass(SequenceFileInputFormat.class);
+        /*job.setInputFormatClass(SequenceFileInputFormat.class);//temorarilly commented out
         job.setOutputFormatClass(SequenceFileOutputFormat.class);*/
-        job.setInputFormatClass(SequenceFileInputFormat.class);
+        job.setInputFormatClass(SequenceFileInputFormat.class);//Added to output the result so far
         job.setOutputFormatClass(TextOutputFormat.class);
 
         // Input from command-line argument, output to predictable place
