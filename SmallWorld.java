@@ -101,6 +101,10 @@ public class SmallWorld {
             activeNodes.clear();
         }
 
+        public void removeActiveNode(long source){
+            activeNodes.remove(source);
+        }
+
         public long getDistance(long source){
             return distances.get(source);
         }
@@ -268,6 +272,7 @@ public class SmallWorld {
             HashMap<Long,Long> tempDist = new HashMap<Long,Long>();
             HashSet<Long> tempActive = new HashSet<Long>();
             long newDist;
+            HashSet<Long> loopedPath = new HashSet<Long>();
             for(EValue value : values) {
                 if(!value.isEmptyDestinations()){
                     for(long node : value.listOfDestinations()){
@@ -278,12 +283,16 @@ public class SmallWorld {
                     newDist = value.getDistance(node);
                     if (tempDist.containsKey(node)){
                         newDist = Math.min(tempDist.get(node),newDist);
+                        loopedPath.add(node);
                     }
                     tempDist.put(node, newDist);
                 }
                 for(long node : value.listOfActiveNodes()){
                     tempActive.add(node);
                 }
+            }
+            for(long node : loopedPath){
+                tempActive.remove(node);
             }
             EValue newVal = new EValue(tempDest, tempDist, tempActive);
             context.write(key,newVal);        
