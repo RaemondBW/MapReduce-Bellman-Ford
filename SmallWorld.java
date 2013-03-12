@@ -198,7 +198,6 @@ public class SmallWorld {
             // We can grab the denom field from context: 
             denom = Integer.parseInt(context.getConfiguration().get("denom"));
 
-            // Example of iterating through an Iterable
             HashSet<Long> tempDest = new HashSet<Long>();
             HashMap<Long,Long> tempDist = new HashMap<Long,Long>();
             HashSet<Long> tempActive = new HashSet<Long>();
@@ -206,7 +205,7 @@ public class SmallWorld {
             for (LongWritable value : values) {
                 tempDest.add(value.get());
             }
-            if (include) {
+            if (include) {          
                 tempDist.put(key.get(),0L);
                 tempActive.add(key.get());
             }
@@ -228,14 +227,30 @@ public class SmallWorld {
         }
     }
 
+    
 
-    public static class DistanceMap extends Mapper<LongWritable, LongWritable,
-            LongWritable, EValue> {
+    //----------- Final Mapper and Reducer Functions. -------------- //
+    // Taking the output distances and using them to create the final histogram
+    public static class DistanceMap extends Mapper<LongWritable, EValue,
+            LongWritable, LongWritable> {
         
         public void map(LongWritable key, EValue value, Context context) 
                 throws IOException, InterruptedException {
-            
+            for (long keys : value.distances.keySet()) {
+                context.write(new LongWritable(value.distances.get(keys)), new LongWritable(1L));
+            }
+        }
+    }
 
+    public static class DistanceReduce extends Reducer<LongWritable, LongWritable,
+            LongWritable, LongWritable> {
+        public void reduce(LongWritable key,Iterable<LongWritable> values, Context context)
+                throws IOException, InterruptedException {
+            long total = 0;
+            for (LongWritable value : values) {
+                total += (long) value.get();
+            }
+            context.write(key,new LongWritable(total));
         }
     }
 
