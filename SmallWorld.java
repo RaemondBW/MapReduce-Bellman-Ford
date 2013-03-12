@@ -113,6 +113,16 @@ public class SmallWorld {
             return Integer.parseInt(value.substring(1));
         }
 
+        public void updateSource(int source, boolean b, int distance){
+            String bool;
+            if(b){
+                bool = "t";
+            } else {
+                bool = "f";
+            }
+            distances.put(source,bool+distance);
+        }
+
         public Set<Integer> listOfSources(){
             return distances.keySet();
         }
