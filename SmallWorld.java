@@ -48,42 +48,24 @@ public class SmallWorld {
     public static class EValue implements Writable {
 
         public HashSet<Long> destinations;
-        public HashMap<Long,String> distances;
+        public HashMap<Long,Long> distances;
+        public HashSet<Long> activeNodes;
 
-        public EValue(HashSet<Long> set, HashMap<Long,String> map){
-            if (set == null){
+        public EValue(HashSet<Long> dest, HashMap<Long,Long> map, HashSet<Long> curr){
+            if (dest == null){
                 destinations = new HashSet<Long>();
             } else {
-                destinations = set;              
+                destinations = dest;              
             }
             if (map == null){
-                distances = new HashMap<Long,String>();
+                distances = new HashMap<Long,Long>();
             } else {
                 distances = map;
             }
-        }
-
-        public EValue(long[] destinations, long[] sources, long[] distances, boolean[] curr){
-            this.destinations = new HashSet<Long>();
-            if(destinations != null){
-                for(long destination : destinations){
-                    this.destinations.add(destination);
-                }               
-            }
-
-            int length = 0;
-            if(sources != null && distances != null){
-                length = sources.length;
-            }
-            this.distances = new HashMap<Long,String>();
-            String bool;
-            for(int i = 0; i < length; i++){
-                if(curr[i]){
-                    bool = "t";
-                } else {
-                    bool = "f";
-                }
-                this.distances.put(sources[i],bool+distances[i]);
+            if (curr == null){
+                activeNodes = new HashSet<Long>();
+            } else {
+                activeNodes = curr;              
             }
         }
 
@@ -99,42 +81,27 @@ public class SmallWorld {
             return destinations;
         }
 
-        public boolean atCurrentDepth(long source){
-            String value = distances.get(source);
-            if(value.charAt(0) == 't'){
-                return true;
-            } else {
-                return false;
-            }
+        public Set<Long> listOfDistanceSources(){
+            return distances.keySet();
+        }
+
+        public Set<Long> listOfActiveNodes(){
+            return activeNodes;
         }
 
         public long getDistance(long source){
-            String value = distances.get(source);
-            return Long.parseLong(value.substring(1));
+            return distances.get(source);
         }
 
-        public void updateSource(long source, boolean b, long distance){
-            String bool;
-            if(b){
-                bool = "t";
-            } else {
-                bool = "f";
-            }
-            distances.put(source,bool+distance);
-        }
-
-        public Set<Long> listOfSources(){
-            return distances.keySet();
+        public void updateDistance(long source, long distance){
+            distances.put(source,distance);
         }
 
         // Serializes object - needed for Writable
         public void write(DataOutput out) throws IOException {
-            //Serialize the HashSet
+            // Serialize the HashSet of destinations
             // It's a good idea to store the length explicitly
-            int length = 0;
-            if (destinations != null){
-                length = destinations.size();
-            }
+            int length = destinations.size();
             // Always write the length, since we need to know
             // even when it's zero
             out.writeInt(length);
@@ -143,14 +110,18 @@ public class SmallWorld {
             }
 
             // Serialize the HashMap
-            length = 0;
-            if (distances != null){
-                length = distances.size();
-            }
+            length = distances.size();
             out.writeInt(length);
-            for (Map.Entry<Long,String> entry : distances.entrySet()){
+            for (Map.Entry<Long,Long> entry : distances.entrySet()){
                 out.writeLong(entry.getKey());
-                out.writeUTF(entry.getValue());
+                out.writeLong(entry.getValue());
+            }
+
+            // Serialize the HashSet of activeNodes
+            length = activeNodes.size();
+            out.writeInt(length);
+            for (long node : activeNodes){
+                out.writeLong(node);
             }
         }
 
@@ -160,14 +131,21 @@ public class SmallWorld {
             int length = in.readInt();
             destinations = new HashSet<Long>();
             for(int i = 0; i < length; i++){
-                destinations.add(in.readInt());
+                destinations.add(in.readLong());
             }
 
             // Rebuilding the HashMap from the serialized object
             length = in.readInt();
-            distances = new HashMap<Long,String>();
+            distances = new HashMap<Long,Long>();
             for(int i = 0; i < length; i++){
-                distances.put(in.readInt(),in.readUTF());
+                distances.put(in.readLong(),in.readLong());
+            }
+
+            // Rebuilding the 2nd HashSet from the serialized object
+            length = in.readInt();
+            activeNodes = new HashSet<Long>();
+            for(int i = 0; i < length; i++){
+                activeNodes.add(in.readLong());
             }
         }
 
@@ -176,11 +154,15 @@ public class SmallWorld {
             for (long destination : destinations){
                 result += destination + ",";
             }
-            result += "     {";
-            for (Map.Entry<Long,String> entry : distances.entrySet()){
-                result += "("+entry.getKey()+","+entry.getValue().substring(1)+","+entry.getValue().substring(0,1)+"), ";
+            result += "      {";
+            for (Map.Entry<Long,Long> entry : distances.entrySet()){
+                result += "("+entry.getKey()+","+entry.getValue()+"), ";
             }
-            result += "}";
+            result += "}      [";
+            for (long node : activeNodes){
+                result += node + ",";
+            }
+            result += "]";
             return result;
         }
     }
@@ -209,28 +191,27 @@ public class SmallWorld {
     public static class LoaderReduce extends Reducer<LongWritable, LongWritable, 
         LongWritable, EValue> {
 
-        public long denom;
+        public int denom;
 
         public void reduce(LongWritable key, Iterable<LongWritable> values, 
             Context context) throws IOException, InterruptedException {
             // We can grab the denom field from context: 
-            denom = Long.parseLong(context.getConfiguration().get("denom"));
+            denom = Integer.parseInt(context.getConfiguration().get("denom"));
 
             // Example of iterating through an Iterable
             HashSet<Long> tempDest = new HashSet<Long>();
-            HashMap<Long,String> tempDist = new HashMap<Long,String>();
-            long newVal;
-            Random probability = new Random();
-            boolean include = probability.nextInt(denom) == 0;
+            HashMap<Long,Long> tempDist = new HashMap<Long,Long>();
+            HashSet<Long> tempActive = new HashSet<Long>();
+            boolean include = new Random().nextInt(denom) == 0;
             for (LongWritable value : values) {
-                newVal = value.get();
-                tempDest.add(newVal);
+                tempDest.add(value.get());
             }
             if (include) {
-                tempDist.put(key,"t0");
+                tempDist.put(key.get(),0L);
+                tempActive.add(key.get());
             }
-            EValue newEvalue = new EValue(tempDest, tempDist);
-            context.write(key,newEvalue);        
+            EValue newVal = new EValue(tempDest, tempDist, tempActive);
+            context.write(key,newVal);        
         }
     }
 
@@ -243,12 +224,6 @@ public class SmallWorld {
         public void map(LongWritable key, EValue value, Context context)
                 throws IOException, InterruptedException {
 
-            if (value.atCurrentDepth(key)){
-                EValue newValue;
-                for (long node : value.listOfDestinations()){
-                    conext.write(node, newValue);
-                }
-            }
             context.write(key, value);
         }
     }
