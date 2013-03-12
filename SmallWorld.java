@@ -325,7 +325,7 @@ public class SmallWorld {
         /*job.setInputFormatClass(SequenceFileInputFormat.class);
         job.setOutputFormatClass(SequenceFileOutputFormat.class);*/
         job.setInputFormatClass(SequenceFileInputFormat.class);
-        job.setOutputFormatClass(SequenceFileInputFormat.class);
+        job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
         // Input from command-line argument, output to predictable place
         FileInputFormat.addInputPath(job, new Path(args[0]));
@@ -352,7 +352,7 @@ public class SmallWorld {
             job.setReducerClass(BFSReduce.class); // currently the default Reducer
 
             job.setInputFormatClass(SequenceFileInputFormat.class);
-            job.setOutputFormatClass(TextOutputFormat.class);
+            job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
             // Notice how each mapreduce job gets gets its own output dir
             FileInputFormat.addInputPath(job, new Path("bfs-" + i + "-out"));
