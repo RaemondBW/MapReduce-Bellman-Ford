@@ -228,6 +228,7 @@ public class SmallWorld {
 
 
     // ------- Add your additional Mappers and Reducers Here ------- //
+
     // The second mapper. Part of the BFS process.
     public static class BFSMap extends Mapper<LongWritable, EValue, 
         LongWritable, EValue> {
@@ -243,7 +244,7 @@ public class SmallWorld {
                 HashSet<Long> tempActive = new HashSet<Long>();
                 tempActive.add(key.get());
                 EValue newVal = new EValue(null, tempDist, tempActive);
-                for(long node : value.listOfActiveNodes()){
+                for(long node : value.listOfDestinations()){
                     tempKey.set(node);
                     context.write(tempKey,newVal);
                 }
@@ -292,10 +293,13 @@ public class SmallWorld {
     public static class DistanceMap extends Mapper<LongWritable, EValue,
             LongWritable, LongWritable> {
         
+        public static final LongWritable ONE = new LongWritable(1L);
         public void map(LongWritable key, EValue value, Context context) 
                 throws IOException, InterruptedException {
-            for (long keys : value.distances.keySet()) {
-                context.write(new LongWritable(value.distances.get(keys)), new LongWritable(1L));
+            LongWritable distance = new LongWritable();
+            for (long node : value.listOfDistanceSources()) {
+                distance.set(value.getDistance(node));
+                context.write(distance, ONE);
             }
         }
     }
@@ -306,20 +310,11 @@ public class SmallWorld {
                 throws IOException, InterruptedException {
             long total = 0;
             for (LongWritable value : values) {
-                total += (long) value.get();
+                total += value.get();
             }
             context.write(key,new LongWritable(total));
         }
     }
-
-
-
-
-
-
-
-
-
 
     public static void main(String[] rawArgs) throws Exception {
         GenericOptionsParser parser = new GenericOptionsParser(rawArgs);
@@ -386,14 +381,14 @@ public class SmallWorld {
             job.waitForCompletion(true);
             i++;
         }
-        /*
+
         // Mapreduce config for histogram computation
         job = new Job(conf, "hist");
         job.setJarByClass(SmallWorld.class);
 
         // Feel free to modify these two lines as necessary:
         job.setMapOutputKeyClass(LongWritable.class);
-        job.setMapOutputValueClass(LongWritable.class);
+        job.setMapOutputValueClass(EValue.class);
 
         // DO NOT MODIFY THE FOLLOWING TWO LINES OF CODE:
         job.setOutputKeyClass(LongWritable.class);
@@ -401,8 +396,8 @@ public class SmallWorld {
 
         // You'll want to modify the following based on what you call your
         // mapper and reducer classes for the Histogram Phase
-        job.setMapperClass(Mapper.class); // currently the default Mapper
-        job.setReducerClass(Reducer.class); // currently the default Reducer
+        job.setMapperClass(DistanceMap.class); // currently the default Mapper
+        job.setReducerClass(DistanceReduce.class); // currently the default Reducer
 
         job.setInputFormatClass(SequenceFileInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);
@@ -412,6 +407,6 @@ public class SmallWorld {
         FileInputFormat.addInputPath(job, new Path("bfs-"+ i +"-out"));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
 
-        job.waitForCompletion(true);*/
+        job.waitForCompletion(true);
     }
 }
