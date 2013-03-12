@@ -47,26 +47,26 @@ public class SmallWorld {
     // Example writable type
     public static class EValue implements Writable {
 
-        public HashSet<Integer> destinations;
-        public HashMap<Integer,String> distances;
+        public HashSet<Long> destinations;
+        public HashMap<Long,String> distances;
 
-        public EValue(HashSet<Integer> set, HashMap<Integer,String> map){
+        public EValue(HashSet<Long> set, HashMap<Long,String> map){
             if (set == null){
-                destinations = new HashSet<Integer>();
+                destinations = new HashSet<Long>();
             } else {
                 destinations = set;              
             }
             if (map == null){
-                distances = new HashMap<Integer,String>();
+                distances = new HashMap<Long,String>();
             } else {
                 distances = map;
             }
         }
 
-        public EValue(int[] destinations, int[] sources, int[] distances, boolean[] curr){
-            this.destinations = new HashSet<Integer>();
+        public EValue(long[] destinations, long[] sources, long[] distances, boolean[] curr){
+            this.destinations = new HashSet<Long>();
             if(destinations != null){
-                for(int destination : destinations){
+                for(long destination : destinations){
                     this.destinations.add(destination);
                 }               
             }
@@ -75,7 +75,7 @@ public class SmallWorld {
             if(sources != null && distances != null){
                 length = sources.length;
             }
-            this.distances = new HashMap<Integer,String>();
+            this.distances = new HashMap<Long,String>();
             String bool;
             for(int i = 0; i < length; i++){
                 if(curr[i]){
@@ -91,15 +91,15 @@ public class SmallWorld {
             // does nothing
         }
 
-        public boolean containsDestination(int destination){
+        public boolean containsDestination(long destination){
             return destinations.contains(destination);
         }
 
-        public Set<Integer> listOfDestinations(){
+        public Set<Long> listOfDestinations(){
             return destinations;
         }
 
-        public boolean atCurrentDepth(int source){
+        public boolean atCurrentDepth(long source){
             String value = distances.get(source);
             if(value.charAt(0) == 't'){
                 return true;
@@ -108,12 +108,12 @@ public class SmallWorld {
             }
         }
 
-        public int distance(int source){
+        public long getDistance(long source){
             String value = distances.get(source);
-            return Integer.parseInt(value.substring(1));
+            return Long.parseLong(value.substring(1));
         }
 
-        public void updateSource(int source, boolean b, int distance){
+        public void updateSource(long source, boolean b, long distance){
             String bool;
             if(b){
                 bool = "t";
@@ -123,7 +123,7 @@ public class SmallWorld {
             distances.put(source,bool+distance);
         }
 
-        public Set<Integer> listOfSources(){
+        public Set<Long> listOfSources(){
             return distances.keySet();
         }
 
@@ -138,8 +138,8 @@ public class SmallWorld {
             // Always write the length, since we need to know
             // even when it's zero
             out.writeInt(length);
-            for (int destination : destinations){
-                out.writeInt(destination);
+            for (long destination : destinations){
+                out.writeLong(destination);
             }
 
             // Serialize the HashMap
@@ -148,8 +148,8 @@ public class SmallWorld {
                 length = distances.size();
             }
             out.writeInt(length);
-            for (Map.Entry<Integer,String> entry : distances.entrySet()){
-                out.writeInt(entry.getKey());
+            for (Map.Entry<Long,String> entry : distances.entrySet()){
+                out.writeLong(entry.getKey());
                 out.writeUTF(entry.getValue());
             }
         }
@@ -158,14 +158,14 @@ public class SmallWorld {
         public void readFields(DataInput in) throws IOException {
             // Rebuilding the HashSet from the serialized object
             int length = in.readInt();
-            destinations = new HashSet<Integer>();
+            destinations = new HashSet<Long>();
             for(int i = 0; i < length; i++){
                 destinations.add(in.readInt());
             }
 
             // Rebuilding the HashMap from the serialized object
             length = in.readInt();
-            distances = new HashMap<Integer,String>();
+            distances = new HashMap<Long,String>();
             for(int i = 0; i < length; i++){
                 distances.put(in.readInt(),in.readUTF());
             }
@@ -173,11 +173,11 @@ public class SmallWorld {
 
         public String toString() {
             String result = "";
-            for (int destination : destinations){
+            for (long destination : destinations){
                 result += destination + ",";
             }
             result += "     {";
-            for (Map.Entry<Integer,String> entry : distances.entrySet()){
+            for (Map.Entry<Long,String> entry : distances.entrySet()){
                 result += "("+entry.getKey()+","+entry.getValue().substring(1)+","+entry.getValue().substring(0,1)+"), ";
             }
             result += "}";
@@ -194,11 +194,8 @@ public class SmallWorld {
         @Override
         public void map(LongWritable key, LongWritable value, Context context)
                 throws IOException, InterruptedException {
-
             // example of getting value passed from main
-            int inputValue = Integer.parseInt(context.getConfiguration().get("inputValue"));
-
-
+            //int inputValue = Integer.parseInt(context.getConfiguration().get("inputValue"));
             context.write(key, value);
         }
     }
@@ -212,33 +209,25 @@ public class SmallWorld {
     public static class LoaderReduce extends Reducer<LongWritable, LongWritable, 
         LongWritable, EValue> {
 
-        public int denom;
+        public long denom;
 
         public void reduce(LongWritable key, Iterable<LongWritable> values, 
             Context context) throws IOException, InterruptedException {
             // We can grab the denom field from context: 
-            denom = Integer.parseInt(context.getConfiguration().get("denom"));
-
-            // You can print it out by uncommenting the following line:
-            //System.out.println(denom);
+            denom = Long.parseLong(context.getConfiguration().get("denom"));
 
             // Example of iterating through an Iterable
-            HashSet<Integer> tempDest = new HashSet<Integer>();
-            HashMap<Integer,String> tempDist = new HashMap<Integer,String>();
-            //for (LongWritable value : values){
-            int newVal;
+            HashSet<Long> tempDest = new HashSet<Long>();
+            HashMap<Long,String> tempDist = new HashMap<Long,String>();
+            long newVal;
             Random probability = new Random();
+            boolean include = probability.nextInt(denom) == 0;
             for (LongWritable value : values) {
-                newVal = (int)value.get();
-                //context.write(key, value);
+                newVal = value.get();
                 tempDest.add(newVal);
-                boolean tf = probability.nextInt(denom) == 0;
-
-                if (!tf) {
-                    tempDist.put(newVal,"f-1");
-                } else {
-                    tempDist.put(newVal,"t0");
-                }
+            }
+            if (include) {
+                tempDist.put(key,"t0");
             }
             EValue newEvalue = new EValue(tempDest, tempDist);
             context.write(key,newEvalue);        
@@ -247,7 +236,22 @@ public class SmallWorld {
 
 
     // ------- Add your additional Mappers and Reducers Here ------- //
+    // The second mapper. Part of the BFS process
+    public static class BFSMap extends Mapper<LongWritable, EValue, 
+        LongWritable, EValue> {
 
+        public void map(LongWritable key, EValue value, Context context)
+                throws IOException, InterruptedException {
+
+            if (value.atCurrentDepth(key)){
+                EValue newValue;
+                for (long node : value.listOfDestinations()){
+                    conext.write(node, newValue);
+                }
+            }
+            context.write(key, value);
+        }
+    }
 
 
 
@@ -306,17 +310,17 @@ public class SmallWorld {
 
             // Feel free to modify these four lines as necessary:
             job.setMapOutputKeyClass(LongWritable.class);
-            job.setMapOutputValueClass(LongWritable.class);
+            job.setMapOutputValueClass(EValue.class);
             job.setOutputKeyClass(LongWritable.class);
-            job.setOutputValueClass(LongWritable.class);
+            job.setOutputValueClass(EValue.class);
 
             // You'll want to modify the following based on what you call
             // your mapper and reducer classes for the BFS phase.
-            job.setMapperClass(Mapper.class); // currently the default Mapper
-            job.setReducerClass(Reducer.class); // currently the default Reducer
+            job.setMapperClass(BFSMap.class); // currently the default Mapper
+            job.setReducerClass(BFSReducer.class); // currently the default Reducer
 
             job.setInputFormatClass(SequenceFileInputFormat.class);
-            job.setOutputFormatClass(SequenceFileOutputFormat.class);
+            job.setOutputFormatClass(TextOutputFormat.class);
 
             // Notice how each mapreduce job gets gets its own output dir
             FileInputFormat.addInputPath(job, new Path("bfs-" + i + "-out"));
