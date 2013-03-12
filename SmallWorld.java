@@ -160,14 +160,14 @@ public class SmallWorld {
             int length = in.readInt();
             destinations = new HashSet<Long>();
             for(int i = 0; i < length; i++){
-                destinations.add(in.readInt());
+                destinations.add(in.readLong());
             }
 
             // Rebuilding the HashMap from the serialized object
             length = in.readInt();
             distances = new HashMap<Long,String>();
             for(int i = 0; i < length; i++){
-                distances.put(in.readInt(),in.readUTF());
+                distances.put(in.readLong(),in.readUTF());
             }
         }
 
@@ -221,13 +221,14 @@ public class SmallWorld {
             HashMap<Long,String> tempDist = new HashMap<Long,String>();
             long newVal;
             Random probability = new Random();
-            boolean include = probability.nextInt(denom) == 0;
+            boolean include = probability.nextInt((int)denom) == 0;
+            //boolean include = (long)(probablility.nextDouble()*denom) == 0;
             for (LongWritable value : values) {
                 newVal = value.get();
                 tempDest.add(newVal);
             }
             if (include) {
-                tempDist.put(key,"t0");
+                tempDist.put((long)key.get(),"t0");
             }
             EValue newEvalue = new EValue(tempDest, tempDist);
             context.write(key,newEvalue);        
@@ -243,13 +244,25 @@ public class SmallWorld {
         public void map(LongWritable key, EValue value, Context context)
                 throws IOException, InterruptedException {
 
-            if (value.atCurrentDepth(key)){
+            if (value.atCurrentDepth((long)key.get())){
                 EValue newValue;
                 for (long node : value.listOfDestinations()){
-                    conext.write(node, newValue);
+                    LongWritable tempNode = new LongWritable(node);
+                    context.write(tempNode, newValue);
                 }
             }
             context.write(key, value);
+        }
+    }
+
+
+    public static class DistanceMap extends Mapper<LongWritable, LongWritable,
+            LongWritable, EValue> {
+        
+        public void map(LongWritable key, EValue value, Context context) 
+                throws IOException, InterruptedException {
+            
+
         }
     }
 
