@@ -162,11 +162,17 @@ public class SmallWorld {
         }
 
         public String toString() {
-            // We highly recommend implementing this for easy testing and
-            // debugging. This version just returns an empty string.
-            return new String();
+            String result = "";
+            for (int destination : destinations){
+                result += destination + ",";
+            }
+            result += "     {";
+            for (Map.Entry<Integer,String> entry : distances.entrySet()){
+                result += "("+entry.getKey()+","+entry.getValue().substring(1)+","+entry.getValue().substring(0,1)+"), ";
+            }
+            result += "}";
+            return result;
         }
-
     }
 
 
