@@ -47,56 +47,118 @@ public class SmallWorld {
     // Example writable type
     public static class EValue implements Writable {
 
-        public int exampleInt; //example integer field
-        public long[] exampleLongArray; //example array of longs
+        public HashSet<Integer> destinations;
+        public HashMap<Integer,String> distances;
 
-        public EValue(int exampleInt, long[] exampleLongArray) {
-            this.exampleInt = exampleInt;
-            this.exampleLongArray = exampleLongArray;
+        public EValue(HashSet<Integer> set, HashMap<Integer,String> map){
+            if (set == null){
+                destinations = new HashSet<Integer>();
+            } else {
+                destinations = set;              
+            }
+            if (map == null){
+                distances = new HashMap<Integer,String>();
+            } else {
+                distances = map;
+            }
+        }
+
+        public EValue(int[] destinations, int[] sources, int[] distances, boolean[] curr){
+            this.destinations = new HashSet<Integer>();
+            if(destinations != null){
+                for(int destination : destinations){
+                    this.destinations.add(destination);
+                }               
+            }
+
+            int length = 0;
+            if(sources != null && distances != null){
+                length = sources.length;
+            }
+            this.distances = new HashMap<Integer,String>();
+            String bool;
+            for(int i = 0; i < length; i++){
+                if(curr[i]){
+                    bool = "t";
+                } else {
+                    bool = "f";
+                }
+                this.distances.put(sources[i],bool+distances[i]);
+            }
         }
 
         public EValue() {
             // does nothing
         }
 
+        public boolean containsDestination(int destination){
+            return destinations.contains(destination);
+        }
+
+        public Set<Integer> listOfDestinations(){
+            return destinations;
+        }
+
+        public boolean atCurrentDepth(int source){
+            String value = distances.get(source);
+            if(value.charAt(0) == 't'){
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        public int distance(int source){
+            String value = distances.get(source);
+            return Integer.parseInt(value.substring(1));
+        }
+
+        public Set<Integer> listOfSources(){
+            return distances.keySet();
+        }
+
         // Serializes object - needed for Writable
         public void write(DataOutput out) throws IOException {
-            out.writeInt(exampleInt);
-
-            // Example of serializing an array:
-            
+            //Serialize the HashSet
             // It's a good idea to store the length explicitly
             int length = 0;
-
-            if (exampleLongArray != null){
-                length = exampleLongArray.length;
+            if (destinations != null){
+                length = destinations.size();
             }
-
-            // always write the length, since we need to know
+            // Always write the length, since we need to know
             // even when it's zero
             out.writeInt(length);
+            for (int destination : destinations){
+                out.writeInt(destination);
+            }
 
-            // now write each long in the array
-            for (int i = 0; i < length; i++){
-                out.writeLong(exampleLongArray[i]);
+            // Serialize the HashMap
+            length = 0;
+            if (distances != null){
+                length = distances.size();
+            }
+            out.writeInt(length);
+            for (Map.Entry<Integer,String> entry : distances.entrySet()){
+                out.writeInt(entry.getKey());
+                out.writeUTF(entry.getValue());
             }
         }
 
         // Deserializes object - needed for Writable
         public void readFields(DataInput in) throws IOException {
-            // example reading an int from the serialized object
-            exampleInt = in.readInt();
-
-            // example reading length from the serialized object
+            // Rebuilding the HashSet from the serialized object
             int length = in.readInt();
-
-            // Example of rebuilding the array from the serialized object
-            exampleLongArray = new long[length];
-            
+            destinations = new HashSet<Integer>();
             for(int i = 0; i < length; i++){
-                exampleLongArray[i] = in.readLong();
+                destinations.add(in.readInt());
             }
 
+            // Rebuilding the HashMap from the serialized object
+            length = in.readInt();
+            distances = new HashMap<Integer,String>();
+            for(int i = 0; i < length; i++){
+                distances.put(in.readInt(),in.readUTF());
+            }
         }
 
         public String toString() {
@@ -153,17 +215,6 @@ public class SmallWorld {
 
 
     // ------- Add your additional Mappers and Reducers Here ------- //
-
-
-    public static class BFSmapper extends Mapper<LongWritable, LongWritable,
-        LongWritable, LongWritable> {
-
-        public long denom;
-
-        public void map(LongWritable key, LongWritable value, Context context) throws IOException, InterruptedException {
-            
-        }
-    }
 
 
 
