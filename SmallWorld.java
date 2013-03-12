@@ -226,18 +226,22 @@ public class SmallWorld {
             HashSet<Integer> tempDest = new HashSet<Integer>();
             HashMap<Integer,String> tempDist = new HashMap<Integer,String>();
             //for (LongWritable value : values){
+            int newVal;
+            Random probability = new Random();
             for (LongWritable value : values) {
+                newVal = (int)value.get();
                 //context.write(key, value);
-                tempDest.add((int)value.get());
-                boolean tf = new Random().nextInt(denom) == 0;
-                if (tf) {
-                    tempDist.put((int)value.get(),"f-1");
+                tempDest.add(newVal);
+                boolean tf = probability.nextInt(denom) == 0;
+
+                if (!tf) {
+                    tempDist.put(newVal,"f-1");
                 } else {
-                    tempDist.put((int)value.get(),"t-1");
+                    tempDist.put(newVal,"t0");
                 }
             }
             EValue newEvalue = new EValue(tempDest, tempDist);
-            context.write(key,newEvalue);
+            context.write(key,newEvalue);        
         }
     }
 
