@@ -225,7 +225,7 @@ public class SmallWorld {
             // If the "include" boolean is true, the current key node
             // is now considered to be a source and is marked as being
             // distance 0 from its self. 
-            if (/*include*/ key.get() == 9803315 || key.get() == 9512380 || key.get() == 9606399) {          
+            if (include/*key.get() == 9803315 || key.get() == 9512380 || key.get() == 9606399*/) {          
                 tempDistances.put(key.get(),0L);
                 tempSourcesCurrenlyHere.add(key.get());
             }
