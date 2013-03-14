@@ -47,25 +47,25 @@ public class SmallWorld {
     // Example writable type
     public static class EValue implements Writable {
 
-        public HashSet<Long> destinations;
+        public HashSet<Long> children;
         public HashMap<Long,Long> distances;
-        public HashSet<Long> activeNodes;
+        public HashSet<Long> sourcesCurrentlyHere;
 
-        public EValue(HashSet<Long> dest, HashMap<Long,Long> map, HashSet<Long> curr){
-            if (dest == null){
-                destinations = new HashSet<Long>();
+        public EValue(HashSet<Long> children, HashMap<Long,Long> distances, HashSet<Long> sourcesCurrentlyHere){
+            if (children == null){
+                this.children = new HashSet<Long>();
             } else {
-                destinations = dest;              
+                this.children = children;
             }
-            if (map == null){
-                distances = new HashMap<Long,Long>();
+            if (distances == null){
+                this.distances = new HashMap<Long,Long>();
             } else {
-                distances = map;
+                this.distances = distances;
             }
-            if (curr == null){
-                activeNodes = new HashSet<Long>();
+            if (sourcesCurrentlyHere == null){
+                this.sourcesCurrentlyHere = new HashSet<Long>();
             } else {
-                activeNodes = curr;              
+                this.sourcesCurrentlyHere = sourcesCurrentlyHere;
             }
         }
 
@@ -73,56 +73,44 @@ public class SmallWorld {
             // does nothing
         }
 
-        public boolean containsDestination(long destination){
-            return destinations.contains(destination);
+        public boolean hasChildren(){
+            return children.isEmpty();
         }
 
-        public boolean isEmptyDestinations(){
-            return destinations.isEmpty();
+        public boolean hasAtLeastOneVisitorSource(){
+            return !sourcesCurrentlyHere.isEmpty();
         }
 
-        public boolean isEmptyDistances(){
-            return distances.isEmpty();
+        public Set<Long> listOfChildren(){
+            return children;
         }
 
-        public Set<Long> listOfDestinations(){
-            return destinations;
-        }
-
-        public Set<Long> listOfDistanceSources(){
+        public Set<Long> listOfSourcesVisitedBy(){
             return distances.keySet();
         }
 
-        public Set<Long> listOfActiveNodes(){
-            return activeNodes;
+        public Set<Long> listOfSourcesCurrentlyHere(){
+            return sourcesCurrentlyHere;
         }
 
-        public void clearListOfActiveNodes(){
-            activeNodes.clear();
-        }
-
-        public void removeActiveNode(long source){
-            activeNodes.remove(source);
+        public void clearListOfSourcesCurrentlyHere(){
+            sourcesCurrentlyHere.clear();
         }
 
         public long getDistance(long source){
             return distances.get(source);
         }
 
-        public void updateDistance(long source, long distance){
-            distances.put(source,distance);
-        }
-
         // Serializes object - needed for Writable
         public void write(DataOutput out) throws IOException {
-            // Serialize the HashSet of destinations
+            // Serialize the HashSet of children
             // It's a good idea to store the length explicitly
-            int length = destinations.size();
+            int length = children.size();
             // Always write the length, since we need to know
             // even when it's zero
             out.writeInt(length);
-            for (long destination : destinations){
-                out.writeLong(destination);
+            for (long child : children){
+                out.writeLong(child);
             }
 
             // Serialize the HashMap
@@ -133,11 +121,11 @@ public class SmallWorld {
                 out.writeLong(entry.getValue());
             }
 
-            // Serialize the HashSet of activeNodes
-            length = activeNodes.size();
+            // Serialize the HashSet of sourcesCurrentlyHere
+            length = sourcesCurrentlyHere.size();
             out.writeInt(length);
-            for (long node : activeNodes){
-                out.writeLong(node);
+            for (long source : sourcesCurrentlyHere){
+                out.writeLong(source);
             }
         }
 
@@ -145,9 +133,9 @@ public class SmallWorld {
         public void readFields(DataInput in) throws IOException {
             // Rebuilding the HashSet from the serialized object
             int length = in.readInt();
-            destinations = new HashSet<Long>();
+            children = new HashSet<Long>();
             for(int i = 0; i < length; i++){
-                destinations.add(in.readLong());
+                children.add(in.readLong());
             }
 
             // Rebuilding the HashMap from the serialized object
@@ -159,24 +147,24 @@ public class SmallWorld {
 
             // Rebuilding the 2nd HashSet from the serialized object
             length = in.readInt();
-            activeNodes = new HashSet<Long>();
+            sourcesCurrentlyHere = new HashSet<Long>();
             for(int i = 0; i < length; i++){
-                activeNodes.add(in.readLong());
+                sourcesCurrentlyHere.add(in.readLong());
             }
         }
 
         public String toString() {
             String result = "";
-            for (long destination : destinations){
-                result += destination + ",";
+            for (long child : children){
+                result += child + ",";
             }
             result += "      {";
             for (Map.Entry<Long,Long> entry : distances.entrySet()){
                 result += "("+entry.getKey()+","+entry.getValue()+"), ";
             }
             result += "}      [";
-            for (long node : activeNodes){
-                result += node + ",";
+            for (long source : sourcesCurrentlyHere){
+                result += source + ",";
             }
             result += "]";
             return result;
@@ -189,12 +177,16 @@ public class SmallWorld {
     public static class LoaderMap extends Mapper<LongWritable, LongWritable, 
         LongWritable, LongWritable> {
 
-        @Override
         public void map(LongWritable key, LongWritable value, Context context)
                 throws IOException, InterruptedException {
+
             // example of getting value passed from main
             //int inputValue = Integer.parseInt(context.getConfiguration().get("inputValue"));
+            
             context.write(key, value);
+            // Write the value as the key and -1 as the child
+            // to indicate that the node exists but doesn't point anywhere
+            context.write(value, new LongWritable(-1L));
         }
     }
 
@@ -211,21 +203,34 @@ public class SmallWorld {
 
         public void reduce(LongWritable key, Iterable<LongWritable> values, 
             Context context) throws IOException, InterruptedException {
+
             // We can grab the denom field from context: 
             denom = Integer.parseInt(context.getConfiguration().get("denom"));
 
-            HashSet<Long> tempDest = new HashSet<Long>();
-            HashMap<Long,Long> tempDist = new HashMap<Long,Long>();
-            HashSet<Long> tempActive = new HashSet<Long>();
+            // Create temp HashSets and HashMaps which are used to
+            // create a new EValue object
+            HashSet<Long> listOfChildren = new HashSet<Long>();
+            HashMap<Long,Long> tempDistances = new HashMap<Long,Long>();
+            HashSet<Long> tempSourcesCurrenlyHere = new HashSet<Long>();
+
+            // Random boolean used to indicte if node is included or not
             boolean include = new Random().nextInt(denom) == 0;
             for (LongWritable value : values) {
-                tempDest.add(value.get());
+                // If the value is -1 the key node has no children
+                if (value.get() != -1){
+                    listOfChildren.add(value.get());
+                }
             }
-            if (include) {          
-                tempDist.put(key.get(),0L);
-                tempActive.add(key.get());
+
+            // If the "include" boolean is true, the current key node
+            // is now considered to be a source and is marked as being
+            // distance 0 from its self. 
+            if (/*include*/ key.get() == 9803315 || key.get() == 9512380 || key.get() == 9606399) {          
+                tempDistances.put(key.get(),0L);
+                tempSourcesCurrenlyHere.add(key.get());
             }
-            EValue newVal = new EValue(tempDest, tempDist, tempActive);
+
+            EValue newVal = new EValue(listOfChildren, tempDistances, tempSourcesCurrenlyHere);
             context.write(key,newVal);        
         }
     }
@@ -238,25 +243,36 @@ public class SmallWorld {
         LongWritable, EValue> {
 
         public void map(LongWritable key, EValue value, Context context)
-                throws IOException, InterruptedException {
-            Set<Long> tempActiveNodes = value.listOfActiveNodes();
-            if(!tempActiveNodes.isEmpty()){
-                LongWritable tempKey = new LongWritable();
-                HashMap<Long,Long> tempDist = new HashMap<Long,Long>();
-                HashSet<Long> tempActive = new HashSet<Long>();
+            throws IOException, InterruptedException {
+
+            if(value.hasAtLeastOneVisitorSource()){
+                HashMap<Long,Long> distancesOfChild = new HashMap<Long,Long>();
+                HashSet<Long> sourcesNowAtChild = new HashSet<Long>();
                 long currDist;
-                for(long node : tempActiveNodes){
-                    currDist = value.getDistance(node);
-                    tempDist.put(node,currDist+1);
-                    tempActive.add(node);
+                // For all sources currenly visiting this source, build a
+                // new distance list with respect to the children and 
+                // move the sources currenly at this node, to be at the
+                // child nodes.
+                for(long source : value.listOfSourcesCurrentlyHere()){
+                    currDist = value.getDistance(source);
+                    distancesOfChild.put(source,currDist+1);
+                    sourcesNowAtChild.add(source);
                 }
-                EValue newVal = new EValue(null, tempDist, tempActive);
-                for(long node : value.listOfDestinations()){
-                    tempKey.set(node);
-                    context.write(tempKey,newVal);
+
+                // For every child of this node, give them the updated 
+                // list of distances and list of sources currenly visiting them
+                LongWritable newKey = new LongWritable();
+                EValue newVal = new EValue(null, distancesOfChild, sourcesNowAtChild);
+                for(long child : value.listOfChildren()){
+                    newKey.set(child);
+                    context.write(newKey,newVal);
                 }
-                value.clearListOfActiveNodes();
+
+                // Clear all the sources from the current node, because
+                // they have now moved onto the children 
+                value.clearListOfSourcesCurrentlyHere();
             }
+
             context.write(key, value);
         }
     }
@@ -265,36 +281,53 @@ public class SmallWorld {
     public static class BFSReduce extends Reducer<LongWritable, EValue, 
         LongWritable, EValue> {
     
-
         public void reduce(LongWritable key, Iterable<EValue> values, 
             Context context) throws IOException, InterruptedException {
-            HashSet<Long> tempDest = new HashSet<Long>();
-            HashMap<Long,Long> tempDist = new HashMap<Long,Long>();
-            HashSet<Long> tempActive = new HashSet<Long>();
-            long newDist;
-            HashSet<Long> loopedPath = new HashSet<Long>();
+
+            HashSet<Long> totalChildren = new HashSet<Long>();
+            HashMap<Long,Long> mergedDistances = new HashMap<Long,Long>();
+            HashSet<Long> sourcesCurrenlyHere = new HashSet<Long>();
+
+            long tempDist;
+            HashSet<Long> revisitedBy = new HashSet<Long>();
             for(EValue value : values) {
-                if(!value.isEmptyDestinations()){
-                    for(long node : value.listOfDestinations()){
-                        tempDest.add(node);
-                    }
+                // Merge all the children (note that only one of the values
+                // will contain children every other value is an intermediate
+                // one with NO children)
+                for(long child : value.listOfChildren()){
+                    totalChildren.add(child);
                 }
-                for(long node : value.listOfDistanceSources()){
-                    newDist = value.getDistance(node);
-                    if (tempDist.containsKey(node)){
-                        newDist = Math.min(tempDist.get(node),newDist);
-                        loopedPath.add(node);
+
+                // Merge all of the distances of the key node with
+                // with respect to each source
+                for(long source : value.listOfSourcesVisitedBy()){
+                    tempDist = value.getDistance(source);
+                    if (mergedDistances.containsKey(source)){
+                        // If the conflicting distances are NOT equal
+                        // the source has looped back to this node
+                        // therefore we should stop if from repeating
+                        // working that it has already done
+                        if (tempDist!=mergedDistances.get(source)){
+                            revisitedBy.add(source);
+                        }
+                        // If there are conflicting distances,
+                        // take the minimum one
+                        tempDist = Math.min(mergedDistances.get(source),tempDist);
                     }
-                    tempDist.put(node, newDist);
+                    mergedDistances.put(source, tempDist);
                 }
-                for(long node : value.listOfActiveNodes()){
-                    tempActive.add(node);
+
+                // Merge all of the sources that are currenly at the key node
+                for(long node : value.listOfSourcesCurrentlyHere()){
+                    sourcesCurrenlyHere.add(node);
                 }
             }
-            for(long node : loopedPath){
-                tempActive.remove(node);
+            // Removed sources that are revisiting this node
+            for(long source : revisitedBy){
+                sourcesCurrenlyHere.remove(source);
             }
-            EValue newVal = new EValue(tempDest, tempDist, tempActive);
+
+            EValue newVal = new EValue(totalChildren, mergedDistances, sourcesCurrenlyHere);
             context.write(key,newVal);        
         }
     }
@@ -309,7 +342,7 @@ public class SmallWorld {
         public void map(LongWritable key, EValue value, Context context) 
                 throws IOException, InterruptedException {
             LongWritable distance = new LongWritable();
-            for (long node : value.listOfDistanceSources()) {
+            for (long node : value.listOfSourcesVisitedBy()) {
                 distance.set(value.getDistance(node));
                 context.write(distance, ONE);
             }
