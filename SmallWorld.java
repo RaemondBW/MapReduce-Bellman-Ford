@@ -427,10 +427,10 @@ public class SmallWorld {
             job.waitForCompletion(true);
 
             //Check to see if the files contain the same information, So that we know whether or not we need to run the bfs mapper and reducer for another iteration.
-            long previousFile = (new File("bfs-"+(i-1)+"-out/part-r-00000")).length();
+            /*long previousFile = (new File("bfs-"+(i-1)+"-out/part-r-00000")).length();
             long currentFile = (new File("bfs-"+(i)+"-out/part-r-00000")).length();
             if (previousFile == currentFile)
-                foundSame = true;
+                foundSame = true;*/
 
             i++;
         }
