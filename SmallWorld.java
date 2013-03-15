@@ -425,14 +425,13 @@ public class SmallWorld {
             FileInputFormat.addInputPath(job, new Path("bfs-" + i + "-out"));
             FileOutputFormat.setOutputPath(job, new Path("bfs-"+ (i+1) +"-out"));
             job.waitForCompletion(true);
-            long previousFile = (new File("bfs-"+(i-1)+"-out/part-r-00000")).length();//.getCanonicalFile().length();
-            long currentFile = (new File("bfs-"+(i)+"-out/part-r-00000")).length();//.getCanonicalFile().length();
-            /*if (currentFile == 0)
-                currentFile = 1L;
-            System.out.println("prevFile Size=" + previousFile + " currFileSize=" + currentFile);
-            System.out.println((previousFile == currentFile));*/
+
+            //Check to see if the files contain the same information, So that we know whether or not we need to run the bfs mapper and reducer for another iteration.
+            long previousFile = (new File("bfs-"+(i-1)+"-out/part-r-00000")).length();
+            long currentFile = (new File("bfs-"+(i)+"-out/part-r-00000")).length();
             if (previousFile == currentFile)
                 foundSame = true;
+
             i++;
         }
 
