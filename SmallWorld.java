@@ -20,6 +20,7 @@
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.io.File;
 import java.lang.Math;
 import java.util.*;
 
@@ -401,7 +402,8 @@ public class SmallWorld {
 
         // Repeats your BFS mapreduce
         int i = 0;
-        while (i < MAX_ITERATIONS) {
+        boolean foundSame = false;
+        while (i < MAX_ITERATIONS && !foundSame) {
             job = new Job(conf, "bfs" + i);
             job.setJarByClass(SmallWorld.class);
 
@@ -422,8 +424,15 @@ public class SmallWorld {
             // Notice how each mapreduce job gets gets its own output dir
             FileInputFormat.addInputPath(job, new Path("bfs-" + i + "-out"));
             FileOutputFormat.setOutputPath(job, new Path("bfs-"+ (i+1) +"-out"));
-
             job.waitForCompletion(true);
+            long previousFile = (new File("bfs-"+(i-1)+"-out/part-r-00000")).length();//.getCanonicalFile().length();
+            long currentFile = (new File("bfs-"+(i)+"-out/part-r-00000")).length();//.getCanonicalFile().length();
+            /*if (currentFile == 0)
+                currentFile = 1L;
+            System.out.println("prevFile Size=" + previousFile + " currFileSize=" + currentFile);
+            System.out.println((previousFile == currentFile));*/
+            if (previousFile == currentFile)
+                foundSame = true;
             i++;
         }
 
